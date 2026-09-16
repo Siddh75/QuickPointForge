@@ -16,14 +16,14 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from splat2lidar import (
+from quickpointforge import (
     load_gaussian_ply,
     VELODYNE_VLP16,
     VELODYNE_HDL64E_APPROX,
     simulate_lidar_scan,
 )
-from splat2lidar.io import filter_splat
-from splat2lidar.export import save_scan
+from quickpointforge.io import filter_splat
+from quickpointforge.export import save_scan
 
 
 def run(ply_path: str, out_dir: str) -> None:

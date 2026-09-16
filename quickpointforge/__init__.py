@@ -1,6 +1,6 @@
 """
-splat2lidar
-===========
+quickpointforge
+================
 
 Simulate a LiDAR-style scan directly from 3D Gaussian Splat *centers*,
 without ray-casting or alpha-blended rasterization.

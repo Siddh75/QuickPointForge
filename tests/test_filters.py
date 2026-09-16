@@ -1,6 +1,6 @@
 import numpy as np
 
-from splat2lidar.io import GaussianSplat, filter_splat
+from quickpointforge.io import GaussianSplat, filter_splat
 
 
 def test_opacity_filter_drops_low_opacity():

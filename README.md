@@ -1,4 +1,4 @@
-# splat2lidar
+# QuickPointForge
 
 Simulate a LiDAR-style point cloud directly from **3D Gaussian Splat centers**
 — no ray-casting, no alpha-blended rasterization. Treats the splat's
@@ -8,13 +8,13 @@ SLAM preprocessing to emulate a real sensor's beam pattern.
 
 ## Why this exists
 
-Every published splat→LiDAR method (SplatAD, LiDAR-GS, LiDAR-RT, GS-LiDAR)
-does proper ray-splat intersection or covariance-aware alpha-blended
-rasterization in spherical/range-view space. That's more physically
-correct (soft returns at occlusion boundaries, opacity-aware blending) but
-computationally heavier. This project explores the cheap end of that
-tradeoff: **can you get a usable synthetic LiDAR scan just by binning raw
-Gaussian centers?**
+Published splat→LiDAR methods (SplatAD, LiDAR-GS, LiDAR-RT, GS-LiDAR) get
+physically accurate results through proper ray-splat intersection or
+covariance-aware alpha-blended rasterization — but that means ray tracing
+through the splat, which is computationally expensive. QuickPointForge is
+a lighter way to get a LiDAR-style point cloud out of a splat: skip ray
+tracing entirely and just bin the Gaussian centers straight into a target
+sensor's beam layout.
 
 Short answer: often yes for interior/bulk geometry, with known weaknesses
 at silhouette edges and in sparsely-sampled regions of the splat.
@@ -51,8 +51,8 @@ A native desktop UI (Open3D's `gui`/`rendering` modules — one window, no
 browser) for interactive use:
 
 ```bash
-splat2lidar-gui          # after `pip install -e .`
-# or: python -m splat2lidar.app
+quickpointforge-gui          # after `pip install -e .`
+# or: python -m quickpointforge.app
 ```
 
 Panel on the left, **two live 3D viewports** on the right:
@@ -86,7 +86,7 @@ headless container/SSH session without a virtual framebuffer.
 
 ## Sensor presets
 
-`splat2lidar.sensors` ships approximate beam tables for spinning sensors:
+`quickpointforge.sensors` ships approximate beam tables for spinning sensors:
 - `VELODYNE_VLP16` (16 beams, ±15°)
 - `VELODYNE_VLP32C_APPROX` (32 beams, -25° to +15°, **uniform approximation**)
 - `VELODYNE_HDL32E_APPROX` (32 beams, -30.67° to +10.67°, **uniform approximation**)

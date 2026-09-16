@@ -1,6 +1,6 @@
 import numpy as np
 
-from splat2lidar.pose import rotation_from_ypr
+from quickpointforge.pose import rotation_from_ypr
 
 
 def test_identity_pose():

@@ -12,9 +12,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from splat2lidar import load_gaussian_ply, VELODYNE_VLP16, simulate_lidar_scan
-from splat2lidar.io import filter_splat
-from splat2lidar.export import save_scan
+from quickpointforge import load_gaussian_ply, VELODYNE_VLP16, simulate_lidar_scan
+from quickpointforge.io import filter_splat
+from quickpointforge.export import save_scan
 
 
 def main():

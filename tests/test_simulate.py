@@ -1,8 +1,8 @@
 import numpy as np
 
-from splat2lidar.io import GaussianSplat
-from splat2lidar.sensors import generic_uniform_sensor, generic_flash_sensor
-from splat2lidar.simulate import simulate_lidar_scan, world_to_sensor
+from quickpointforge.io import GaussianSplat
+from quickpointforge.sensors import generic_uniform_sensor, generic_flash_sensor
+from quickpointforge.simulate import simulate_lidar_scan, world_to_sensor
 
 
 def _flat_sensor(num_beams=1, azimuth_resolution_deg=90.0, max_range_m=100.0, min_range_m=0.1):

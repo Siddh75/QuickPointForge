@@ -1,5 +1,5 @@
 """
-splat2lidar desktop app.
+QuickPointForge desktop app.
 
 A single native window (Open3D's gui + rendering modules) with:
   - a control panel on the left (load, filter, sensor, pose, run, export)
@@ -10,8 +10,8 @@ A single native window (Open3D's gui + rendering modules) with:
       * "Simulated LiDAR" view -- the binned scan result, colorable by
         range / intensity / beam index / RGB.
 
-Run with:  python -m splat2lidar.app   (or the `splat2lidar-gui` console
-script once the package is installed)
+Run with:  python -m quickpointforge.app   (or the `quickpointforge-gui`
+console script once the package is installed)
 Requires a display (X11/Wayland/macOS/Windows) -- this will not run in a
 headless container.
 """
@@ -64,9 +64,9 @@ def _values_to_rgb(values: np.ndarray, colormap: str = "turbo") -> np.ndarray:
     return colormaps[colormap](v)[:, :3]
 
 
-class Splat2LidarApp:
+class QuickPointForgeApp:
     def __init__(self):
-        self.window = gui.Application.instance.create_window("splat2lidar", 1600, 900)
+        self.window = gui.Application.instance.create_window("QuickPointForge", 1600, 900)
         w = self.window
         em = w.theme.font_size
 
@@ -436,7 +436,7 @@ class Splat2LidarApp:
 
 def main():
     gui.Application.instance.initialize()
-    app = Splat2LidarApp()
+    app = QuickPointForgeApp()
     gui.Application.instance.run()
 
 
