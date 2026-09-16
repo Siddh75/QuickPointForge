@@ -8,35 +8,14 @@ SLAM preprocessing to emulate a real sensor's beam pattern.
 
 ## Why this exists
 
-Published splat→LiDAR methods (SplatAD, LiDAR-GS, LiDAR-RT, GS-LiDAR) get
-physically accurate results through proper ray-splat intersection or
-covariance-aware alpha-blended rasterization — but that means ray tracing
-through the splat, which is computationally expensive. QuickPointForge is
-a lighter way to get a LiDAR-style point cloud out of a splat: skip ray
-tracing entirely and just bin the Gaussian centers straight into a target
-sensor's beam layout.
+QuickPointForge is a lightweight way to turn a 3D Gaussian Splat into a
+LiDAR-style point cloud, with no ray tracing involved: it treats the
+splat's Gaussian centers as if they were a dense photogrammetry point
+cloud, then bins them directly into a target sensor's real beam layout.
 
-Short answer: often yes for interior/bulk geometry, with known weaknesses
-at silhouette edges and in sparsely-sampled regions of the splat.
-
-## How it works
-
-1. **Load** a 3DGS-format `.ply` (centers, opacity, scale, SH-DC color).
-2. **Filter** low-opacity "floater" Gaussians (and optionally oversized
-   background blobs) before projecting.
-3. **Transform** centers into the sensor's local frame given a pose.
-4. **Project** to spherical coordinates: range, azimuth, elevation
-   (sensor-frame convention: x-forward, y-left, z-up).
-5. **Bin** each point into a `(beam_index, azimuth_bin)` cell using the
-   target sensor's real fixed beam elevation angles and azimuth
-   resolution.
-6. **Resolve occlusion** by keeping only the *nearest-range* point in each
-   cell — the cheap substitute for a proper first-return ray-surface
-   intersection or z-buffer.
-
-This is an `O(N log N)` sort (`np.lexsort` + `np.unique`), not
-`O(num_rays × num_splats)` ray-surface intersection — no BVH, no
-ray-triangle tests.
+Short answer: this works well for interior/bulk geometry, with known
+weaknesses at silhouette edges and in sparsely-sampled regions of the
+splat.
 
 ## Install
 
