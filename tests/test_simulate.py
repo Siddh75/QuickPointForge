@@ -1,7 +1,7 @@
 import numpy as np
 
 from splat2lidar.io import GaussianSplat
-from splat2lidar.sensors import generic_uniform_sensor
+from splat2lidar.sensors import generic_uniform_sensor, generic_flash_sensor
 from splat2lidar.simulate import simulate_lidar_scan, world_to_sensor
 
 
@@ -93,3 +93,38 @@ def test_hit_rate_matches_total_cells():
 
     assert scan.total_cells == 4
     assert np.isclose(scan.hit_rate(), 1 / 4)
+
+
+def _flash_sensor():
+    """Single-beam flash sensor with a +/-30 deg azimuth FOV -- no wraparound."""
+    return generic_flash_sensor(
+        name="test-flash",
+        num_beams=1,
+        fov_min_deg=0.0,
+        fov_max_deg=0.0,
+        num_azimuth_beams=3,
+        azimuth_fov_min_deg=-30.0,
+        azimuth_fov_max_deg=30.0,
+        max_range_m=100.0,
+        min_range_m=0.1,
+    )
+
+
+def test_flash_sensor_drops_points_outside_fov():
+    # Forward point (0 deg) is inside the +/-30 deg FOV; the behind point
+    # (180 deg) would wrap into a spinning sensor's grid but must be
+    # dropped outright for a flash sensor.
+    centers = np.array([[5.0, 0.0, 0.0], [-5.0, 0.0, 0.0]])
+    opacity = np.ones(2)
+    splat = GaussianSplat(centers=centers, opacity=opacity, scale=None, color=None)
+
+    sensor = _flash_sensor()
+    scan = simulate_lidar_scan(splat, sensor, sensor_position=np.array([0.0, 0.0, 0.0]))
+
+    assert scan.num_output_points == 1
+    assert np.isclose(scan.ranges[0], 5.0)
+
+
+def test_flash_sensor_num_azimuth_bins_matches_grid():
+    sensor = _flash_sensor()
+    assert sensor.num_azimuth_bins == 3

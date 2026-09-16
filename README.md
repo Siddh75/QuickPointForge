@@ -124,15 +124,29 @@ headless container/SSH session without a virtual framebuffer.
 
 ## Sensor presets
 
-`splat2lidar.sensors` ships approximate beam tables for:
+`splat2lidar.sensors` ships approximate beam tables for spinning sensors:
 - `VELODYNE_VLP16` (16 beams, ±15°)
+- `VELODYNE_VLP32C_APPROX` (32 beams, -25° to +15°, **uniform approximation**)
+- `VELODYNE_HDL32E_APPROX` (32 beams, -30.67° to +10.67°, **uniform approximation**)
 - `VELODYNE_HDL64E_APPROX` (64 beams, -24.8° to +2°, **uniform approximation**
   — the real unit has non-uniform per-beam spacing)
+- `OUSTER_OS0_128_APPROX` (128 beams, ±45°, wide-FOV/short-range variant, **uniform approximation**)
 - `OUSTER_OS1_64_APPROX` (64 beams, ±22.5°, **uniform approximation**)
+- `OUSTER_OS2_128_APPROX` (128 beams, ±11.25°, narrow-FOV/long-range variant, **uniform approximation**)
+- `HESAI_PANDAR64_APPROX` (64 beams, -25° to +15°, **uniform approximation**)
 
-Use `generic_uniform_sensor(...)` to define your own, or build a
-`SensorModel` directly from a real factory calibration file if you have
-one and need per-beam accuracy.
+Use `generic_uniform_sensor(...)` to define your own spinning sensor, or
+build a `SensorModel` directly from a real factory calibration file if you
+have one and need per-beam accuracy.
+
+For **flash** sensors (fixed rectangular FOV, single-shot, no 360°
+wraparound), `SensorModel.azimuth_fov_deg` bounds the azimuth grid instead
+of wrapping it. Two illustrative examples are provided (not tied to a
+specific real product's datasheet):
+- `FLASH_LIDAR_EXAMPLE` (64x64 grid, ±30°x±15° FOV, 60m range)
+- `FLASH_LIDAR_NARROW_LONGRANGE_EXAMPLE` (96x48 grid, ±10°x±5° FOV, 150m range)
+
+Use `generic_flash_sensor(...)` to define your own.
 
 ## Known limitations (read before trusting the output)
 

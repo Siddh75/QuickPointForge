@@ -7,6 +7,8 @@ middle -- dense enough to sanity-check beam binning and occlusion (the
 sphere should occlude the far wall behind it for beams that hit it).
 """
 
+import os
+
 import numpy as np
 from plyfile import PlyData, PlyElement
 
@@ -82,6 +84,6 @@ if __name__ == "__main__":
     ])
     color = rng.uniform(0.3, 0.9, (n, 3))
 
-    out_path = "/home/claude/splat2lidar/examples/synthetic_room.ply"
+    out_path = os.path.join(os.path.dirname(__file__), "synthetic_room.ply")
     write_gaussian_ply(out_path, centers, opacity, scale, color)
     print(f"Wrote {n} synthetic Gaussian points to {out_path}")

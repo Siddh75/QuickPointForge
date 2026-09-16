@@ -15,7 +15,21 @@ See README.md for the accuracy/speed tradeoff this implies.
 """
 
 from .io import load_gaussian_ply, GaussianSplat
-from .sensors import SensorModel, VELODYNE_VLP16, VELODYNE_HDL64E_APPROX, OUSTER_OS1_64_APPROX, generic_uniform_sensor
+from .sensors import (
+    SensorModel,
+    VELODYNE_VLP16,
+    VELODYNE_VLP32C_APPROX,
+    VELODYNE_HDL32E_APPROX,
+    VELODYNE_HDL64E_APPROX,
+    OUSTER_OS0_128_APPROX,
+    OUSTER_OS1_64_APPROX,
+    OUSTER_OS2_128_APPROX,
+    HESAI_PANDAR64_APPROX,
+    FLASH_LIDAR_EXAMPLE,
+    FLASH_LIDAR_NARROW_LONGRANGE_EXAMPLE,
+    generic_uniform_sensor,
+    generic_flash_sensor,
+)
 from .simulate import simulate_lidar_scan, ScanResult
 
 __all__ = [
@@ -23,9 +37,17 @@ __all__ = [
     "GaussianSplat",
     "SensorModel",
     "VELODYNE_VLP16",
+    "VELODYNE_VLP32C_APPROX",
+    "VELODYNE_HDL32E_APPROX",
     "VELODYNE_HDL64E_APPROX",
+    "OUSTER_OS0_128_APPROX",
     "OUSTER_OS1_64_APPROX",
+    "OUSTER_OS2_128_APPROX",
+    "HESAI_PANDAR64_APPROX",
+    "FLASH_LIDAR_EXAMPLE",
+    "FLASH_LIDAR_NARROW_LONGRANGE_EXAMPLE",
     "generic_uniform_sensor",
+    "generic_flash_sensor",
     "simulate_lidar_scan",
     "ScanResult",
 ]

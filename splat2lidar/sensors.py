@@ -10,6 +10,7 @@ angles instead of using the presets below.
 """
 
 from dataclasses import dataclass, field
+from typing import Optional, Tuple
 
 import numpy as np
 
@@ -18,10 +19,14 @@ import numpy as np
 class SensorModel:
     name: str
     beam_elevations_deg: np.ndarray   # (num_beams,) fixed vertical angles, sensor frame
-    azimuth_resolution_deg: float     # angular step between azimuth bins
+    azimuth_resolution_deg: float     # angular step between azimuth bins/columns
     max_range_m: float = 120.0
     min_range_m: float = 0.5
     elevation_tolerance_deg: float = field(default=None)  # None -> auto (half min spacing)
+    # None -> spinning sensor, azimuth wraps over the full 360 deg circle.
+    # (min_deg, max_deg) -> flash-style sensor: fixed rectangular FOV, no
+    # wraparound, azimuth measured the same way as elevation (0 = forward).
+    azimuth_fov_deg: Optional[Tuple[float, float]] = None
 
     def __post_init__(self):
         self.beam_elevations_deg = np.asarray(self.beam_elevations_deg, dtype=np.float64)
@@ -38,7 +43,10 @@ class SensorModel:
 
     @property
     def num_azimuth_bins(self) -> int:
-        return int(round(360.0 / self.azimuth_resolution_deg))
+        if self.azimuth_fov_deg is None:
+            return int(round(360.0 / self.azimuth_resolution_deg))
+        fov_min, fov_max = self.azimuth_fov_deg
+        return int(round((fov_max - fov_min) / self.azimuth_resolution_deg)) + 1
 
 
 def generic_uniform_sensor(
@@ -58,6 +66,34 @@ def generic_uniform_sensor(
         azimuth_resolution_deg=azimuth_resolution_deg,
         max_range_m=max_range_m,
         min_range_m=min_range_m,
+    )
+
+
+def generic_flash_sensor(
+    name: str,
+    num_beams: int,
+    fov_min_deg: float,
+    fov_max_deg: float,
+    num_azimuth_beams: int,
+    azimuth_fov_min_deg: float,
+    azimuth_fov_max_deg: float,
+    max_range_m: float = 120.0,
+    min_range_m: float = 0.5,
+) -> SensorModel:
+    """
+    Build a SensorModel for a flash-style sensor: a fixed rectangular grid
+    of beams over a limited (non-wrapping) FOV, all captured in one shot --
+    as opposed to a spinning sensor sweeping a full 360 deg circle over time.
+    """
+    elevations = np.linspace(fov_min_deg, fov_max_deg, num_beams)
+    azimuth_resolution_deg = (azimuth_fov_max_deg - azimuth_fov_min_deg) / max(num_azimuth_beams - 1, 1)
+    return SensorModel(
+        name=name,
+        beam_elevations_deg=elevations,
+        azimuth_resolution_deg=azimuth_resolution_deg,
+        max_range_m=max_range_m,
+        min_range_m=min_range_m,
+        azimuth_fov_deg=(azimuth_fov_min_deg, azimuth_fov_max_deg),
     )
 
 
@@ -92,4 +128,76 @@ OUSTER_OS1_64_APPROX = generic_uniform_sensor(
     fov_max_deg=22.5,
     azimuth_resolution_deg=0.35,  # 1024 or 2048 columns/rev typical; 0.35 deg ~ 1024 cols
     max_range_m=120.0,
+)
+
+VELODYNE_VLP32C_APPROX = generic_uniform_sensor(
+    name="Velodyne VLP-32C (uniform approximation)",
+    num_beams=32,
+    fov_min_deg=-25.0,
+    fov_max_deg=15.0,
+    azimuth_resolution_deg=0.2,
+    max_range_m=200.0,
+)
+
+VELODYNE_HDL32E_APPROX = generic_uniform_sensor(
+    name="Velodyne HDL-32E (uniform approximation)",
+    num_beams=32,
+    fov_min_deg=-30.67,
+    fov_max_deg=10.67,
+    azimuth_resolution_deg=0.2,
+    max_range_m=100.0,
+)
+
+OUSTER_OS0_128_APPROX = generic_uniform_sensor(
+    name="Ouster OS0-128 (uniform approximation)",
+    num_beams=128,
+    fov_min_deg=-45.0,
+    fov_max_deg=45.0,   # ultra-wide vertical FOV variant, short range
+    azimuth_resolution_deg=0.35,
+    max_range_m=50.0,
+)
+
+OUSTER_OS2_128_APPROX = generic_uniform_sensor(
+    name="Ouster OS2-128 (uniform approximation)",
+    num_beams=128,
+    fov_min_deg=-11.25,
+    fov_max_deg=11.25,  # narrow vertical FOV variant, long range
+    azimuth_resolution_deg=0.18,
+    max_range_m=240.0,
+)
+
+HESAI_PANDAR64_APPROX = generic_uniform_sensor(
+    name="Hesai Pandar64 (uniform approximation)",
+    num_beams=64,
+    fov_min_deg=-25.0,
+    fov_max_deg=15.0,
+    azimuth_resolution_deg=0.2,
+    max_range_m=200.0,
+)
+
+# Illustrative flash LiDAR (not tied to a specific real product's exact
+# datasheet): a fixed 64x64 grid over a camera-like FOV, single-shot,
+# no 360 deg wraparound. Swap the FOV/grid numbers for your target unit.
+FLASH_LIDAR_EXAMPLE = generic_flash_sensor(
+    name="Flash LiDAR (example, 60x30 FOV)",
+    num_beams=64,
+    fov_min_deg=-15.0,
+    fov_max_deg=15.0,
+    num_azimuth_beams=64,
+    azimuth_fov_min_deg=-30.0,
+    azimuth_fov_max_deg=30.0,
+    max_range_m=60.0,
+)
+
+# Second illustrative flash example: narrower FOV, longer range -- the
+# automotive-forward-looking end of the flash LiDAR tradeoff space.
+FLASH_LIDAR_NARROW_LONGRANGE_EXAMPLE = generic_flash_sensor(
+    name="Flash LiDAR (example, 20x10 FOV, long range)",
+    num_beams=48,
+    fov_min_deg=-5.0,
+    fov_max_deg=5.0,
+    num_azimuth_beams=96,
+    azimuth_fov_min_deg=-10.0,
+    azimuth_fov_max_deg=10.0,
+    max_range_m=150.0,
 )

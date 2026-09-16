@@ -60,8 +60,9 @@ def _cartesian_to_spherical(points_sensor: np.ndarray):
     r = np.linalg.norm(points_sensor, axis=1)
     horiz = np.sqrt(x * x + y * y)
     elevation_deg = np.degrees(np.arctan2(z, horiz))
+    # Raw azimuth in (-180, 180], 0 = forward (+x). Spinning sensors wrap
+    # this to [0, 360) below; flash sensors use it as-is against their FOV.
     azimuth_deg = np.degrees(np.arctan2(y, x))
-    azimuth_deg = np.mod(azimuth_deg, 360.0)
     return r, azimuth_deg, elevation_deg
 
 
@@ -98,12 +99,22 @@ def simulate_lidar_scan(
     beam_diff = diff[np.arange(len(diff)), beam_index]
     within_tolerance = beam_diff <= sensor.elevation_tolerance_deg
 
-    azimuth_bin = np.mod(
-        np.round(azimuth_deg / sensor.azimuth_resolution_deg).astype(np.int64),
-        sensor.num_azimuth_bins,
-    )
+    if sensor.azimuth_fov_deg is None:
+        azimuth_wrapped = np.mod(azimuth_deg, 360.0)
+        azimuth_bin = np.mod(
+            np.round(azimuth_wrapped / sensor.azimuth_resolution_deg).astype(np.int64),
+            sensor.num_azimuth_bins,
+        )
+        in_fov = np.ones(azimuth_deg.shape, dtype=bool)
+    else:
+        fov_min, fov_max = sensor.azimuth_fov_deg
+        in_fov = (azimuth_deg >= fov_min) & (azimuth_deg <= fov_max)
+        azimuth_bin = np.clip(
+            np.round((azimuth_deg - fov_min) / sensor.azimuth_resolution_deg).astype(np.int64),
+            0, sensor.num_azimuth_bins - 1,
+        )
 
-    keep = in_range & within_tolerance
+    keep = in_range & within_tolerance & in_fov
     num_input = points_sensor.shape[0]
 
     total_cells = sensor.num_beams * sensor.num_azimuth_bins

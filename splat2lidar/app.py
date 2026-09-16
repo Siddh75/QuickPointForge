@@ -22,11 +22,15 @@ import numpy as np
 import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
-from matplotlib import cm
+from matplotlib import colormaps
 
 from .io import load_gaussian_ply, filter_splat, GaussianSplat
 from .sensors import (
-    SensorModel, VELODYNE_VLP16, VELODYNE_HDL64E_APPROX, OUSTER_OS1_64_APPROX,
+    SensorModel,
+    VELODYNE_VLP16, VELODYNE_VLP32C_APPROX, VELODYNE_HDL32E_APPROX, VELODYNE_HDL64E_APPROX,
+    OUSTER_OS0_128_APPROX, OUSTER_OS1_64_APPROX, OUSTER_OS2_128_APPROX,
+    HESAI_PANDAR64_APPROX,
+    FLASH_LIDAR_EXAMPLE, FLASH_LIDAR_NARROW_LONGRANGE_EXAMPLE,
     generic_uniform_sensor,
 )
 from .simulate import simulate_lidar_scan, ScanResult
@@ -36,8 +40,15 @@ from .export import save_scan
 
 SENSOR_PRESETS = {
     "Velodyne VLP-16": VELODYNE_VLP16,
+    "Velodyne VLP-32C (approx)": VELODYNE_VLP32C_APPROX,
+    "Velodyne HDL-32E (approx)": VELODYNE_HDL32E_APPROX,
     "Velodyne HDL-64E (approx)": VELODYNE_HDL64E_APPROX,
+    "Ouster OS0-128 (approx)": OUSTER_OS0_128_APPROX,
     "Ouster OS1-64 (approx)": OUSTER_OS1_64_APPROX,
+    "Ouster OS2-128 (approx)": OUSTER_OS2_128_APPROX,
+    "Hesai Pandar64 (approx)": HESAI_PANDAR64_APPROX,
+    "Flash LiDAR (example, 60x30 FOV)": FLASH_LIDAR_EXAMPLE,
+    "Flash LiDAR (example, 20x10 FOV, long range)": FLASH_LIDAR_NARROW_LONGRANGE_EXAMPLE,
     "Custom...": None,
 }
 
@@ -50,7 +61,7 @@ def _values_to_rgb(values: np.ndarray, colormap: str = "turbo") -> np.ndarray:
     if hi <= lo:
         hi = lo + 1e-6
     v = np.clip((v - lo) / (hi - lo), 0.0, 1.0)
-    return cm.get_cmap(colormap)(v)[:, :3]
+    return colormaps[colormap](v)[:, :3]
 
 
 class Splat2LidarApp:
@@ -99,6 +110,11 @@ class Splat2LidarApp:
         self._info_label = gui.Label("No splat loaded.")
         self._panel.add_child(self._info_label)
         self._panel.add_fixed(0.5 * em)
+
+        # Shown centered over the (otherwise empty) splat viewport until a
+        # splat is loaded, so there's an obvious call to action there too.
+        self._load_overlay_btn = gui.Button("Load Gaussian splat...")
+        self._load_overlay_btn.set_on_clicked(self._on_load_clicked)
 
         self._panel.add_child(gui.Label("2. Filter Gaussians"))
         self._opacity_slider = self._add_slider("Min opacity", 0.0, 1.0, 0.2)
@@ -167,6 +183,7 @@ class Splat2LidarApp:
         w.add_child(self._title_splat)
         w.add_child(self._title_lidar)
         w.add_child(self._panel)
+        w.add_child(self._load_overlay_btn)  # added last -> drawn on top of the scene
         w.set_on_layout(self._on_layout)
 
     # ---- layout -------------------------------------------------------------
@@ -188,6 +205,15 @@ class Splat2LidarApp:
 
         self._title_lidar.frame = gui.Rect(lidar_x + 8, r.y + 4, remaining - half - 16, title_h)
         self._scene_lidar.frame = gui.Rect(lidar_x, r.y + title_h, remaining - half, r.height - title_h)
+
+        if self._load_overlay_btn.visible:
+            constraint = gui.Widget.Constraints()
+            constraint.width = half
+            constraint.height = r.height - title_h
+            pref = self._load_overlay_btn.calc_preferred_size(layout_context, constraint)
+            btn_x = self._scene_splat.frame.x + (self._scene_splat.frame.width - pref.width) // 2
+            btn_y = self._scene_splat.frame.y + (self._scene_splat.frame.height - pref.height) // 2
+            self._load_overlay_btn.frame = gui.Rect(btn_x, btn_y, pref.width, pref.height)
 
     # ---- small widget helpers -------------------------------------------------
     def _add_slider(self, label, lo, hi, default):
@@ -284,6 +310,7 @@ class Splat2LidarApp:
             f"bounds: [{bounds_min[0]:.2f},{bounds_min[1]:.2f},{bounds_min[2]:.2f}] to "
             f"[{bounds_max[0]:.2f},{bounds_max[1]:.2f},{bounds_max[2]:.2f}]"
         )
+        self._load_overlay_btn.visible = False
         self._refresh_splat_view()
         self._update_gizmo()
         self.window.set_needs_layout()
