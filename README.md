@@ -1,21 +1,13 @@
 # QuickPointForge
 
-Simulate a LiDAR-style point cloud directly from **3D Gaussian Splat centers**
-— no ray-casting, no alpha-blended rasterization. Treats the splat's
-Gaussian means as if they were a dense photogrammetry point cloud, then
-reuses the standard point-cloud-to-range-image binning approach from LiDAR
-SLAM preprocessing to emulate a real sensor's beam pattern.
-
-## Why this exists
-
 QuickPointForge is a lightweight way to turn a 3D Gaussian Splat into a
-LiDAR-style point cloud, with no ray tracing involved: it treats the
-splat's Gaussian centers as if they were a dense photogrammetry point
-cloud, then bins them directly into a target sensor's real beam layout.
-
-Short answer: this works well for interior/bulk geometry, with known
-weaknesses at silhouette edges and in sparsely-sampled regions of the
-splat.
+LiDAR-style point cloud — no ray tracing, no alpha-blended rasterization.
+It treats the splat's Gaussian centers as if they were a dense
+photogrammetry point cloud, then bins them directly into a target
+sensor's real beam layout, reusing the standard point-cloud-to-range-image
+approach from LiDAR SLAM preprocessing. This works well for interior/bulk
+geometry, with known weaknesses at silhouette edges and in
+sparsely-sampled regions of the splat.
 
 ## Install
 
