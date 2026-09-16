@@ -39,10 +39,16 @@ This is an `O(N log N)` sort (`np.lexsort` + `np.unique`), not
 `O(num_rays × num_splats)` ray-surface intersection — no BVH, no
 ray-triangle tests.
 
+## Install
+
+```bash
+pip install -e ".[dev]"    # editable install + pytest, for development
+# or: pip install -e .     # without dev/test dependencies
+```
+
 ## Quickstart
 
 ```bash
-pip install -r requirements.txt
 
 cd examples
 python make_synthetic_splat.py   # generates a synthetic room+sphere "splat"
@@ -71,13 +77,20 @@ save_scan(scan, "simulated_scan.pcd")
 print(scan.num_output_points, "points, hit rate", scan.hit_rate())
 ```
 
+## Running tests
+
+```bash
+pytest tests/ -v
+```
+
 ## Desktop app
 
 A native desktop UI (Open3D's `gui`/`rendering` modules — one window, no
 browser) for interactive use:
 
 ```bash
-python app.py
+splat2lidar-gui          # after `pip install -e .`
+# or: python -m splat2lidar.app
 ```
 
 Panel on the left, **two live 3D viewports** on the right:
