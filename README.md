@@ -1,13 +1,9 @@
 # QuickPointForge
 
-QuickPointForge is a lightweight way to turn a 3D Gaussian Splat into a
-LiDAR-style point cloud — no ray tracing, no alpha-blended rasterization.
-It treats the splat's Gaussian centers as if they were a dense
-photogrammetry point cloud, then bins them directly into a target
-sensor's real beam layout, reusing the standard point-cloud-to-range-image
-approach from LiDAR SLAM preprocessing. This works well for interior/bulk
-geometry, with known weaknesses at silhouette edges and in
-sparsely-sampled regions of the splat.
+QuickPointForge is a light tool that generates LiDAR-style point clouds
+from 3D Gaussian Splats — no ray tracing, no alpha-blended rasterization.
+This works well for interior/bulk geometry, with known weaknesses at
+silhouette edges and in sparsely-sampled regions of the splat.
 
 ## Install
 
@@ -80,14 +76,3 @@ specific real product's datasheet):
 - `FLASH_LIDAR_NARROW_LONGRANGE_EXAMPLE` (96x48 grid, ±10°x±5° FOV, 150m range)
 
 Use `generic_flash_sensor(...)` to define your own.
-
-## Project background
-
-Built as a fast/cheap alternative to research pipelines like
-[SplatAD](https://research.zenseact.com/publications/splatad/),
-[LiDAR-GS](https://arxiv.org/abs/2410.05111), and
-[LiDAR-RT](https://arxiv.org/pdf/2412.15199), which all preserve
-covariance/opacity-aware alpha blending during LiDAR rendering. This
-project deliberately trades that away for speed and simplicity, and is
-meant as an engineering baseline to benchmark against, not a claim of
-matching their fidelity.
