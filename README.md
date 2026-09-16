@@ -17,8 +17,7 @@ tradeoff: **can you get a usable synthetic LiDAR scan just by binning raw
 Gaussian centers?**
 
 Short answer: often yes for interior/bulk geometry, with known weaknesses
-at silhouette edges and in sparsely-sampled regions of the splat. See
-"Known limitations" below.
+at silhouette edges and in sparsely-sampled regions of the splat.
 
 ## How it works
 
@@ -48,43 +47,6 @@ pip install -e ".[dev]"    # editable install + pytest, for development
 
 ## Quickstart
 
-```bash
-
-cd examples
-python make_synthetic_splat.py   # generates a synthetic room+sphere "splat"
-python run_demo.py               # simulates a VLP-16 scan, saves simulated_scan.pcd
-```
-
-To use with a real trained 3DGS scene:
-
-```python
-from splat2lidar import load_gaussian_ply, VELODYNE_HDL64E_APPROX, simulate_lidar_scan
-from splat2lidar.io import filter_splat
-from splat2lidar.export import save_scan
-import numpy as np
-
-splat = load_gaussian_ply("point_cloud.ply")     # standard 3DGS export
-splat = filter_splat(splat, min_opacity=0.2)
-
-scan = simulate_lidar_scan(
-    splat,
-    sensor=VELODYNE_HDL64E_APPROX,
-    sensor_position=np.array([0.0, 0.0, 1.8]),   # e.g. sensor mounted 1.8m up
-    return_frame="world",
-)
-
-save_scan(scan, "simulated_scan.pcd")
-print(scan.num_output_points, "points, hit rate", scan.hit_rate())
-```
-
-## Running tests
-
-```bash
-pytest tests/ -v
-```
-
-## Desktop app
-
 A native desktop UI (Open3D's `gui`/`rendering` modules — one window, no
 browser) for interactive use:
 
@@ -108,9 +70,9 @@ Panel on the left, **two live 3D viewports** on the right:
    Gaussians and drops round "floater" blobs), optional max scale.
    Click "Apply filters" to see the surviving count and update the splat
    view.
-3. **Sensor**: pick a preset (VLP-16 / HDL-64E-approx / OS1-64-approx) or
-   "Custom..." to enter your own beam count, FOV, azimuth resolution,
-   and range limits.
+3. **Sensor**: pick a spinning or flash preset (see "Sensor presets"
+   below) or "Custom..." to enter your own beam count, FOV, azimuth
+   resolution, and range limits.
 4. **Pose**: sensor position (x/y/z) and orientation (yaw/pitch/roll) —
    the gizmo in the splat view moves live as you type.
 5. **Simulate scan** — runs the binning algorithm and reports input/output
@@ -147,37 +109,6 @@ specific real product's datasheet):
 - `FLASH_LIDAR_NARROW_LONGRANGE_EXAMPLE` (96x48 grid, ±10°x±5° FOV, 150m range)
 
 Use `generic_flash_sensor(...)` to define your own.
-
-## Known limitations (read before trusting the output)
-
-- **Center-to-surface offset**: raw, unregularized 3DGS Gaussian centers
-  don't sit exactly on the true surface — this is well documented (it's
-  literally SuGaR's motivation). Expect worse accuracy on scenes trained
-  without surface-alignment regularization (vanilla 3DGS) than on
-  2DGS/SuGaR-regularized scenes.
-- **Hard occlusion, no soft returns**: nearest-in-cell is a binary choice.
-  Real LiDAR (and proper ray-splat rendering) gives graceful partial
-  returns at silhouette edges; this method doesn't. Expect the largest
-  error concentration at object boundaries, thin structures, and
-  transparent/reflective surfaces.
-- **No multi-return simulation**: only one point per cell, so no
-  second/third returns through foliage or glass.
-- **No physically grounded intensity**: `scan.intensity` is a proxy taken
-  directly from Gaussian opacity, not a real reflectance value.
-- **Density-dependent gaps**: splat density is uneven (denser near
-  training camera viewpoints). Cells with no nearby Gaussian center within
-  tolerance simply get no return — there's no fallback interpolation in
-  v0.1. Check `scan.hit_rate()` per scene.
-
-## Roadmap
-
-- [ ] Fallback interpolation for empty cells (k-NN within angular cone)
-- [ ] Range-dependent noise model to match a target sensor's real
-      accuracy/precision spec
-- [ ] Benchmark script: synthetic mesh → splat → {this method, proper
-      ray-splat intersection} → Chamfer distance, to quantify the
-      accuracy/speed tradeoff directly rather than estimating it
-- [ ] Real factory beam-table loader (non-uniform calibration files)
 
 ## Project background
 
