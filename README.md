@@ -62,15 +62,9 @@ headless container/SSH session without a virtual framebuffer.
 - `OUSTER_OS2_128_APPROX` (128 beams, ±11.25°, narrow-FOV/long-range variant, **uniform approximation**)
 - `HESAI_PANDAR64_APPROX` (64 beams, -25° to +15°, **uniform approximation**)
 
-Use `generic_uniform_sensor(...)` to define your own spinning sensor, or
-build a `SensorModel` directly from a real factory calibration file if you
-have one and need per-beam accuracy.
-
 For **flash** sensors (fixed rectangular FOV, single-shot, no 360°
 wraparound), `SensorModel.azimuth_fov_deg` bounds the azimuth grid instead
 of wrapping it. Two illustrative examples are provided (not tied to a
 specific real product's datasheet):
 - `FLASH_LIDAR_EXAMPLE` (64x64 grid, ±30°x±15° FOV, 60m range)
 - `FLASH_LIDAR_NARROW_LONGRANGE_EXAMPLE` (96x48 grid, ±10°x±5° FOV, 150m range)
-
-Use `generic_flash_sensor(...)` to define your own.
