@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Test/tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# OS
+.DS_Store
+
+# Project-generated artifacts (regenerate via examples/make_synthetic_splat.py
+# and examples/run_demo.py -- not meant to be committed)
+examples/synthetic_room.ply
+examples/simulated_scan.pcd
+*.pcd
+outputs/

@@ -1,0 +1,150 @@
+"""
+Core algorithm: spherical binning of Gaussian splat centers to simulate a
+LiDAR scan, without ray-casting.
+
+Pipeline per scan:
+    1. Transform splat centers into the sensor frame (given sensor pose).
+    2. Convert to spherical coordinates (range, azimuth, elevation).
+       Sensor-frame convention: x-forward, y-left, z-up (REP-103 style).
+    3. Drop points outside [min_range, max_range] or too far from any beam's
+       elevation (beyond elevation_tolerance_deg).
+    4. Assign each surviving point to a (beam_index, azimuth_bin) cell.
+    5. Within each cell, keep only the point with the smallest range
+       (approximates a first-return LiDAR without a real z-buffer / BVH).
+
+This trades ray-casting's correct occlusion + alpha-blended soft returns
+for an O(N log N) sort -- see README.md for the accuracy tradeoff this implies.
+"""
+
+from dataclasses import dataclass
+from typing import Optional
+
+import numpy as np
+
+from .io import GaussianSplat
+from .sensors import SensorModel
+
+
+@dataclass
+class ScanResult:
+    points: np.ndarray            # (M, 3) xyz in the SAME frame as `world_points_frame` arg
+    ranges: np.ndarray            # (M,)
+    beam_index: np.ndarray        # (M,) int
+    azimuth_bin: np.ndarray       # (M,) int
+    intensity: Optional[np.ndarray]   # (M,) in [0, 1], proxy from opacity, or None
+    color: Optional[np.ndarray]       # (M, 3) in [0, 1], carried through from the splat, or None
+    num_input_points: int
+    num_output_points: int
+    total_cells: int = 0
+
+    def hit_rate(self) -> Optional[float]:
+        """Fraction of the sensor's (beam, azimuth) cells that got a return, if known."""
+        if not self.total_cells:
+            return None
+        return self.num_output_points / self.total_cells
+
+
+def world_to_sensor(points_world: np.ndarray, sensor_position: np.ndarray, sensor_rotation: np.ndarray) -> np.ndarray:
+    """
+    Transform points from world frame to sensor frame.
+
+    sensor_position: (3,) sensor origin in world coordinates.
+    sensor_rotation: (3, 3) rotation matrix, columns = sensor axes expressed
+        in world coordinates (i.e. world_point = R @ sensor_point + t).
+    """
+    return (points_world - sensor_position[None, :]) @ sensor_rotation  # R^T applied via right-multiply
+
+
+def _cartesian_to_spherical(points_sensor: np.ndarray):
+    x, y, z = points_sensor[:, 0], points_sensor[:, 1], points_sensor[:, 2]
+    r = np.linalg.norm(points_sensor, axis=1)
+    horiz = np.sqrt(x * x + y * y)
+    elevation_deg = np.degrees(np.arctan2(z, horiz))
+    azimuth_deg = np.degrees(np.arctan2(y, x))
+    azimuth_deg = np.mod(azimuth_deg, 360.0)
+    return r, azimuth_deg, elevation_deg
+
+
+def simulate_lidar_scan(
+    splat: GaussianSplat,
+    sensor: SensorModel,
+    sensor_position: np.ndarray,
+    sensor_rotation: Optional[np.ndarray] = None,
+    return_frame: str = "sensor",
+) -> ScanResult:
+    """
+    Simulate one LiDAR sweep by binning Gaussian centers into the sensor's
+    beam/azimuth grid and keeping the nearest-range point per cell.
+
+    sensor_position: (3,) sensor origin, world coordinates.
+    sensor_rotation: (3, 3) rotation matrix (world <- sensor axes), identity
+        if None (i.e. sensor axes aligned with world axes).
+    return_frame: "sensor" (default) or "world" -- which frame the output
+        `points` are expressed in. Range/beam/azimuth bookkeeping is
+        always computed in the sensor frame regardless.
+    """
+    if sensor_rotation is None:
+        sensor_rotation = np.eye(3)
+
+    points_sensor = world_to_sensor(splat.centers, np.asarray(sensor_position, dtype=np.float64), sensor_rotation)
+    r, azimuth_deg, elevation_deg = _cartesian_to_spherical(points_sensor)
+
+    in_range = (r >= sensor.min_range_m) & (r <= sensor.max_range_m)
+
+    # Nearest-beam assignment + tolerance check.
+    beam_elev = sensor.beam_elevations_deg  # (num_beams,)
+    diff = np.abs(elevation_deg[:, None] - beam_elev[None, :])   # (N, num_beams)
+    beam_index = np.argmin(diff, axis=1)
+    beam_diff = diff[np.arange(len(diff)), beam_index]
+    within_tolerance = beam_diff <= sensor.elevation_tolerance_deg
+
+    azimuth_bin = np.mod(
+        np.round(azimuth_deg / sensor.azimuth_resolution_deg).astype(np.int64),
+        sensor.num_azimuth_bins,
+    )
+
+    keep = in_range & within_tolerance
+    num_input = points_sensor.shape[0]
+
+    total_cells = sensor.num_beams * sensor.num_azimuth_bins
+
+    idx = np.nonzero(keep)[0]
+    if idx.size == 0:
+        empty = np.zeros((0, 3))
+        return ScanResult(
+            points=empty, ranges=np.zeros(0), beam_index=np.zeros(0, dtype=np.int64),
+            azimuth_bin=np.zeros(0, dtype=np.int64), intensity=None, color=None,
+            num_input_points=num_input, num_output_points=0, total_cells=total_cells,
+        )
+
+    r_k = r[idx]
+    beam_k = beam_index[idx]
+    az_k = azimuth_bin[idx]
+    cell_key = beam_k.astype(np.int64) * sensor.num_azimuth_bins + az_k
+
+    # Sort by (cell_key, range) ascending, then take the first row of each
+    # group -> nearest-range point per (beam, azimuth) cell.
+    order = np.lexsort((r_k, cell_key))
+    cell_key_sorted = cell_key[order]
+    _, first_pos = np.unique(cell_key_sorted, return_index=True)
+    winners = idx[order[first_pos]]
+
+    points_sensor_out = points_sensor[winners]
+    points_world_out = splat.centers[winners]
+
+    intensity = splat.opacity[winners].copy() if splat.opacity is not None else None
+    color = splat.color[winners].copy() if splat.color is not None else None
+
+    out_points = points_sensor_out if return_frame == "sensor" else points_world_out
+
+    return ScanResult(
+        points=out_points,
+        ranges=r[winners],
+        beam_index=beam_index[winners],
+        azimuth_bin=azimuth_bin[winners],
+        intensity=intensity,
+        color=color,
+        num_input_points=num_input,
+        num_output_points=len(winners),
+        total_cells=total_cells,
+    )
