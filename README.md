@@ -2,8 +2,6 @@
 
 QuickPointForge is a light tool that generates LiDAR-style point clouds
 from 3D Gaussian Splats — no ray tracing, no alpha-blended rasterization.
-This works well for interior/bulk geometry, with known weaknesses at
-silhouette edges and in sparsely-sampled regions of the splat.
 
 ## Install
 
