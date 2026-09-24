@@ -2,7 +2,7 @@ import numpy as np
 
 from quickpointforge.io import GaussianSplat
 from quickpointforge.sensors import generic_uniform_sensor, generic_flash_sensor
-from quickpointforge.simulate import simulate_lidar_scan, world_to_sensor
+from quickpointforge.simulate import simulate_lidar_scan, world_to_sensor, concatenate_scans
 
 
 def _flat_sensor(num_beams=1, azimuth_resolution_deg=90.0, max_range_m=100.0, min_range_m=0.1):
@@ -128,3 +128,44 @@ def test_flash_sensor_drops_points_outside_fov():
 def test_flash_sensor_num_azimuth_bins_matches_grid():
     sensor = _flash_sensor()
     assert sensor.num_azimuth_bins == 3
+
+
+def test_timestamp_stamps_every_output_point():
+    centers = np.array([[2.0, 0.0, 0.0]])
+    splat = GaussianSplat(centers=centers, opacity=np.ones(1), scale=None, color=None)
+    sensor = _flat_sensor()
+
+    scan = simulate_lidar_scan(splat, sensor, sensor_position=np.array([0.0, 0.0, 0.0]), timestamp=1.5)
+
+    assert np.allclose(scan.timestamp, [1.5])
+
+
+def test_concatenate_scans_merges_points_and_timestamps():
+    centers = np.array([[2.0, 0.0, 0.0]])
+    splat = GaussianSplat(centers=centers, opacity=np.ones(1), scale=None, color=None)
+    sensor = _flat_sensor()
+
+    scan_a = simulate_lidar_scan(splat, sensor, sensor_position=np.array([0.0, 0.0, 0.0]), timestamp=0.0)
+    scan_b = simulate_lidar_scan(splat, sensor, sensor_position=np.array([1.0, 0.0, 0.0]), timestamp=1.0)
+    merged = concatenate_scans([scan_a, scan_b])
+
+    assert merged.num_output_points == scan_a.num_output_points + scan_b.num_output_points
+    assert np.allclose(merged.timestamp, [0.0, 1.0])
+    assert merged.total_cells == scan_a.total_cells + scan_b.total_cells
+
+
+def test_beam_assignment_matches_brute_force_on_unsorted_table():
+    # Non-uniform, unsorted beam table (like a factory calibration file):
+    # searchsorted assignment must match the nearest-beam argmin exactly.
+    from quickpointforge.sensors import SensorModel
+    rng = np.random.default_rng(0)
+    beams = np.array([3.0, -20.0, 0.5, -7.5, 12.0, -1.0])
+    sensor = SensorModel("t", beams, azimuth_resolution_deg=0.5, elevation_tolerance_deg=5.0)
+    centers = rng.uniform(-20, 20, size=(5000, 3))
+    splat = GaussianSplat(centers=centers, opacity=np.ones(len(centers)), scale=None, color=None)
+    scan = simulate_lidar_scan(splat, sensor, sensor_position=np.zeros(3))
+
+    elev = np.degrees(np.arctan2(scan.points[:, 2], np.hypot(scan.points[:, 0], scan.points[:, 1])))
+    expected = np.argmin(np.abs(elev[:, None] - beams[None, :]), axis=1)
+    assert scan.num_output_points > 100
+    assert np.array_equal(scan.beam_index, expected)

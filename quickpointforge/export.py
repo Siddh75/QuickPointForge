@@ -13,14 +13,21 @@ def save_scan(scan: ScanResult, path: str) -> None:
     Save a ScanResult's points (+ color, if present) to disk.
 
     Format is inferred from the extension: .pcd, .ply, or .npy.
-    For .npy, saves an (M, 7) array: [x, y, z, range, beam_index, azimuth_bin, intensity].
+    For .npy, saves an (M, 7) array: [x, y, z, range, beam_index, azimuth_bin, intensity],
+    or (M, 8) with a trailing timestamp column if `scan.timestamp` is set (e.g. a
+    scan merged from several trajectory samples via `concatenate_scans`).
+    Only .npy carries the timestamp column -- .pcd/.ply have no custom scalar
+    field via Open3D's writer.
     """
     if path.endswith(".npy"):
         intensity = scan.intensity if scan.intensity is not None else np.zeros(scan.num_output_points)
-        arr = np.column_stack([
+        columns = [
             scan.points, scan.ranges, scan.beam_index.astype(np.float64),
             scan.azimuth_bin.astype(np.float64), intensity,
-        ])
+        ]
+        if scan.timestamp is not None:
+            columns.append(scan.timestamp)
+        arr = np.column_stack(columns)
         np.save(path, arr)
         return
 

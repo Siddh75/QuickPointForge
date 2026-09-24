@@ -17,7 +17,7 @@ for an O(N log N) sort -- see README.md for the accuracy tradeoff this implies.
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 
@@ -36,6 +36,7 @@ class ScanResult:
     num_input_points: int
     num_output_points: int
     total_cells: int = 0
+    timestamp: Optional[np.ndarray] = None  # (M,) time the scan producing each point was taken, or None
 
     def hit_rate(self) -> Optional[float]:
         """Fraction of the sensor's (beam, azimuth) cells that got a return, if known."""
@@ -72,6 +73,7 @@ def simulate_lidar_scan(
     sensor_position: np.ndarray,
     sensor_rotation: Optional[np.ndarray] = None,
     return_frame: str = "sensor",
+    timestamp: Optional[float] = None,
 ) -> ScanResult:
     """
     Simulate one LiDAR sweep by binning Gaussian centers into the sensor's
@@ -83,6 +85,9 @@ def simulate_lidar_scan(
     return_frame: "sensor" (default) or "world" -- which frame the output
         `points` are expressed in. Range/beam/azimuth bookkeeping is
         always computed in the sensor frame regardless.
+    timestamp: if given, stamps every output point with this time (e.g. a
+        sample time along a Trajectory) -- see `concatenate_scans` for
+        merging several timestamped scans into one exportable cloud.
     """
     if sensor_rotation is None:
         sensor_rotation = np.eye(3)
@@ -92,12 +97,14 @@ def simulate_lidar_scan(
 
     in_range = (r >= sensor.min_range_m) & (r <= sensor.max_range_m)
 
-    # Nearest-beam assignment + tolerance check.
-    beam_elev = sensor.beam_elevations_deg  # (num_beams,)
-    diff = np.abs(elevation_deg[:, None] - beam_elev[None, :])   # (N, num_beams)
-    beam_index = np.argmin(diff, axis=1)
-    beam_diff = diff[np.arange(len(diff)), beam_index]
-    within_tolerance = beam_diff <= sensor.elevation_tolerance_deg
+    # Nearest-beam assignment + tolerance check: binary search against the
+    # midpoints between sorted beams -- O(N log B) instead of an
+    # (N, num_beams) distance matrix (GBs for 128-beam sensors).
+    beam_order = np.argsort(sensor.beam_elevations_deg, kind="stable")
+    beam_sorted = sensor.beam_elevations_deg[beam_order]
+    nearest = np.searchsorted((beam_sorted[:-1] + beam_sorted[1:]) / 2.0, elevation_deg)
+    beam_index = beam_order[nearest]
+    within_tolerance = np.abs(elevation_deg - beam_sorted[nearest]) <= sensor.elevation_tolerance_deg
 
     if sensor.azimuth_fov_deg is None:
         azimuth_wrapped = np.mod(azimuth_deg, 360.0)
@@ -126,6 +133,7 @@ def simulate_lidar_scan(
             points=empty, ranges=np.zeros(0), beam_index=np.zeros(0, dtype=np.int64),
             azimuth_bin=np.zeros(0, dtype=np.int64), intensity=None, color=None,
             num_input_points=num_input, num_output_points=0, total_cells=total_cells,
+            timestamp=np.zeros(0) if timestamp is not None else None,
         )
 
     r_k = r[idx]
@@ -134,8 +142,10 @@ def simulate_lidar_scan(
     cell_key = beam_k.astype(np.int64) * sensor.num_azimuth_bins + az_k
 
     # Sort by (cell_key, range) ascending, then take the first row of each
-    # group -> nearest-range point per (beam, azimuth) cell.
-    order = np.lexsort((r_k, cell_key))
+    # group -> nearest-range point per (beam, azimuth) cell. Packing both into
+    # one float key (range < max_range + 1 so cells can't overlap) lets a single
+    # argsort replace a 2-key lexsort, ~2x faster.
+    order = np.argsort(cell_key * (sensor.max_range_m + 1.0) + r_k)
     cell_key_sorted = cell_key[order]
     _, first_pos = np.unique(cell_key_sorted, return_index=True)
     winners = idx[order[first_pos]]
@@ -158,4 +168,26 @@ def simulate_lidar_scan(
         num_input_points=num_input,
         num_output_points=len(winners),
         total_cells=total_cells,
+        timestamp=np.full(len(winners), timestamp) if timestamp is not None else None,
+    )
+
+
+def concatenate_scans(scans: Sequence[ScanResult]) -> ScanResult:
+    """Merge scans taken at different poses/times (e.g. samples along a
+    Trajectory) into one ScanResult, for a single combined export."""
+    def cat(field):
+        parts = [getattr(s, field) for s in scans]
+        return np.concatenate(parts) if all(p is not None for p in parts) else None
+
+    return ScanResult(
+        points=np.concatenate([s.points for s in scans]),
+        ranges=np.concatenate([s.ranges for s in scans]),
+        beam_index=np.concatenate([s.beam_index for s in scans]),
+        azimuth_bin=np.concatenate([s.azimuth_bin for s in scans]),
+        intensity=cat("intensity"),
+        color=cat("color"),
+        num_input_points=sum(s.num_input_points for s in scans),
+        num_output_points=sum(s.num_output_points for s in scans),
+        total_cells=sum(s.total_cells for s in scans),
+        timestamp=cat("timestamp"),
     )
